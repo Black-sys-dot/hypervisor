@@ -76,6 +76,14 @@ class MockLibvirtConnection:
         else:
             raise Exception("Domain not found")
             
+    def create_mock_domain(self, name: str, vcpus: int, memory_kb: int) -> MockDomain:
+        new_id = len(self._domains) + 1
+        dom = MockDomain(name, new_id, str(uuid.uuid4()), 5) # 5 = shut off initially
+        dom._vcpus = vcpus
+        dom._memory = memory_kb
+        self._domains.append(dom)
+        return dom
+
     def close(self) -> int:
         return 0
 
@@ -83,6 +91,7 @@ class LibvirtManager:
     def __init__(self):
         self.conn = None
         self.is_mock = False
+        self.dummy_vms = [] # Stores fake VMs when safe-locks prevent real creation
 
     def connect(self):
         if HAS_LIBVIRT:

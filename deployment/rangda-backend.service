@@ -1,0 +1,14 @@
+[Unit]
+Description=Rangda Hypervisor Core Control Plane API
+After=network.target libvirtd.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/rangda-dashboard/backend
+ExecStart=/usr/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

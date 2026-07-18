@@ -2,3 +2,4 @@ fastapi
 uvicorn
 libvirt-python
 pydantic
+psutil

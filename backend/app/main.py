@@ -11,6 +11,15 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize the libvirt connection pool
+    try:
+        with open("/etc/os-release") as f:
+            if "EndeavourOS" in f.read():
+                logger.warning("Development Sandbox Net Active (EndeavourOS Detected).")
+            else:
+                logger.info("Live Target 'rangda' Active.")
+    except Exception:
+        pass
+        
     logger.info("Starting up Rangda API...")
     manager = get_libvirt_manager()
     manager.connect()
@@ -44,8 +53,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.api.storage import router as storage_router
+
 # Mount Routers
 app.include_router(vms_router, prefix="/api/vms", tags=["Virtual Machines"])
+app.include_router(storage_router, prefix="/api/storage", tags=["Storage"])
 
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -58,10 +70,27 @@ def root():
 frontend_path = os.path.join(os.path.dirname(__file__), "../../frontend")
 app.mount("/dashboard", StaticFiles(directory=frontend_path, html=True), name="frontend")
 
-@app.get("/health", tags=["Health"])
+import psutil
+
+@app.get("/api/health", tags=["Health"])
 def health_check():
     manager = get_libvirt_manager()
     return {
         "status": "ok",
         "libvirt_mock_mode": manager.is_mock
+    }
+
+@app.get("/api/host/metrics", tags=["Host"])
+def host_metrics():
+    mem = psutil.virtual_memory()
+    return {
+        "memory": {
+            "total_gb": round(mem.total / (1024**3), 2),
+            "used_gb": round(mem.used / (1024**3), 2),
+            "percent": mem.percent
+        },
+        "cpu": {
+            "cores": psutil.cpu_count(logical=True),
+            "percent": psutil.cpu_percent(interval=None)
+        }
     }

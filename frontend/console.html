@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VM Console</title>
+    <style>
+        body { margin: 0; background-color: #09090b; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: system-ui, -apple-system, sans-serif; }
+        #screen { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        #status { position: absolute; color: rgba(255,255,255,0.5); font-size: 14px; text-transform: uppercase; letter-spacing: 2px; }
+        canvas { box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+    </style>
+</head>
+<body>
+    <div id="status">Connecting to console...</div>
+    <div id="screen"></div>
+    <script type="module">
+        import RFB from 'https://cdn.jsdelivr.net/npm/@novnc/novnc@1.4.0/core/rfb.js';
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const wsPort = urlParams.get('ws');
+        const host = window.location.hostname;
+        
+        if (wsPort) {
+            const url = `ws://${host}:${wsPort}`;
+            try {
+                const rfb = new RFB(document.getElementById('screen'), url, {
+                    credentials: { password: '' }
+                });
+                rfb.scaleViewport = true;
+                rfb.resizeSession = true;
+                rfb.addEventListener('connect', () => {
+                    document.getElementById('status').style.display = 'none';
+                });
+                rfb.addEventListener('disconnect', (e) => {
+                    document.getElementById('status').style.display = 'block';
+                    document.getElementById('status').innerText = 'Disconnected from console.';
+                });
+            } catch (e) {
+                document.getElementById('status').innerText = 'Failed to initialize noVNC: ' + e;
+            }
+        } else {
+            document.getElementById('status').innerText = "Error: No WebSocket port specified.";
+        }
+    </script>
+</body>
+</html>
