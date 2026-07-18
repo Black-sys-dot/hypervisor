@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RANGDA // CORE HYPERVISOR v2</title>
+    
+    <!-- Tailwind CSS (CDN to avoid npm) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        ruby: '#dc2626',
+                        'ruby-glow': '#ef4444',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- React & ReactDOM (CDN) -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- Babel for on-the-fly JSX transpilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-black text-white h-screen w-screen overflow-hidden">
+    <div id="root" class="h-full w-full"></div>
+    
+    <!-- Application Logic -->
+    <script type="text/babel" src="api.js"></script>
+    <script type="text/babel" src="app.jsx"></script>
+</body>
+</html>
