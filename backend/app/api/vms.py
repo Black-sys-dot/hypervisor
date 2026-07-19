@@ -203,15 +203,19 @@ def create_vm(vm_data: VMCreate, manager: LibvirtManager = Depends(get_libvirt_m
   <vcpu placement='static'>{vm_data.vcpus}</vcpu>
   <os>
     <type arch='x86_64' machine='q35'>hvm</type>
-    <boot dev='cdrom'/>
     <boot dev='hd'/>
+    <boot dev='cdrom'/>
   </os>
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
   <cpu mode='host-passthrough' check='none'/>
   <devices>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
       <source file='/var/lib/libvirt/images/{safe_name}.qcow2'/>
-      <target dev='vda' bus='virtio'/>
+      <target dev='sdb' bus='sata'/>
     </disk>
     <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>
@@ -225,7 +229,7 @@ def create_vm(vm_data: VMCreate, manager: LibvirtManager = Depends(get_libvirt_m
     </interface>
     <graphics type='vnc' port='-1' autoport='yes' websocket='-1' listen='0.0.0.0'/>
     <video>
-      <model type='qxl'/>
+      <model type='qxl' ram='65536' vram='65536' vgamem='16384' heads='1'/>
     </video>
     <input type='tablet' bus='usb'/>
     <input type='mouse' bus='ps2'/>
