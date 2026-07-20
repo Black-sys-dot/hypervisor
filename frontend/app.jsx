@@ -197,7 +197,7 @@ function App() {
                             onClick={() => setShowModal(true)} 
                             className="text-xs uppercase tracking-wider bg-white/[0.03] border border-white/[0.08] px-4 py-2 rounded hover:bg-white/[0.08] transition-all text-white/90 hover:text-white flex items-center gap-2 shadow-lg"
                         >
-                            <span className="text-ruby text-lg leading-none">+</span> Summon Lyak
+                            <span className="text-ruby text-lg leading-none">+</span> Summon Leyak
                         </button>
                     </div>
 
@@ -219,9 +219,9 @@ function App() {
                                         <div className="absolute inset-0 bg-gradient-to-br from-ruby/20 via-transparent to-transparent pointer-events-none animate-pulse"></div>
                                     )}
 
-                                    {/* Role Tag (Rangda / Lyak) */}
+                                    {/* Role Tag (Rangda / Leyak) */}
                                     <div className={`absolute top-0 right-0 px-3 py-1 rounded-bl-lg text-[10px] font-bold tracking-widest uppercase z-10 ${vm.name === "Rangda's VM" ? 'bg-ruby text-white shadow-[0_0_10px_rgba(220,38,38,0.5)]' : 'bg-yellow-500 text-black shadow-[0_0_10px_rgba(234,179,8,0.5)]'}`}>
-                                        {vm.name === "Rangda's VM" ? "RANGDA" : "LYAK"}
+                                        {vm.name === "Rangda's VM" ? "RANGDA" : "LEYAK"}
                                     </div>
 
                                     {/* Left Side: Avatar Image */}
@@ -303,7 +303,7 @@ function App() {
             {showModal && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-md z-50 flex items-center justify-center p-4">
                     <div className="bg-white/[0.02] border border-white/10 shadow-2xl p-6 rounded-xl max-w-md w-full relative">
-                        <h2 className="text-xl font-semibold mb-6 tracking-wide text-white/90">Summon New Lyak</h2>
+                        <h2 className="text-xl font-semibold mb-6 tracking-wide text-white/90">Summon New Leyak</h2>
                         <form onSubmit={handleCreateVM} className="flex flex-col gap-4">
                             <div>
                                 <label className="block text-xs uppercase text-white/50 mb-1 tracking-wider">Instance Name</label>
@@ -385,7 +385,7 @@ function App() {
                                     disabled={isSubmitting}
                                     className="px-6 py-2 text-sm bg-white/5 hover:bg-white/10 border border-white/10 rounded transition-all text-ruby hover:text-ruby-glow shadow-[0_0_10px_rgba(220,38,38,0.2)] uppercase tracking-wider disabled:opacity-50"
                                 >
-                                    {isSubmitting ? 'Summoning...' : 'Summon Lyak'}
+                                    {isSubmitting ? 'Summoning...' : 'Summon Leyak'}
                                 </button>
                             </div>
                         </form>

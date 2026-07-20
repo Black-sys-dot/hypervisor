@@ -88,12 +88,12 @@ async def initiate_transfer(req: TransferRequest, manager: LibvirtManager = Depe
     # Host Transfer Rules
     if src_name == "Rangda (Host)":
         if dest_name != "Rangda's VM":
-            raise HTTPException(status_code=403, detail="SECURITY VIOLATION: Host can only transfer files directly to Rangda's VM, not Lyaks.")
+            raise HTTPException(status_code=403, detail="SECURITY VIOLATION: Host can only transfer files directly to Rangda's VM, not Leyaks.")
 
     # Rule A Enforcement: The One-Way Valve (Egress Blocked)
     if src_name == "Rangda's VM":
         if dest_name != "Rangda (Host)":
-            raise HTTPException(status_code=403, detail="SECURITY VIOLATION: Egress from Rangda's VM to Lyaks is physically blocked at the core.")
+            raise HTTPException(status_code=403, detail="SECURITY VIOLATION: Egress from Rangda's VM to Leyaks is physically blocked at the core.")
         if not req.source_path.startswith("~/Downloads") and not req.source_path.startswith("/Downloads"):
             raise HTTPException(status_code=403, detail="SECURITY VIOLATION: Rangda's VM can only egress files to Host from the authorized Intake folders.")
         if not req.dest_path.startswith("/quarantine"):
