@@ -102,6 +102,7 @@ class LibvirtManager:
                     raise Exception("Failed to open connection to qemu:///system")
                 self.is_mock = False
                 logger.info("Successfully connected to libvirt (qemu:///system).")
+                self._ensure_rangda_vm()
                 return
             except libvirt.libvirtError as e:
                 logger.warning(f"Failed to connect to libvirt: {e}. Falling back to Mock Storage.")
@@ -111,6 +112,50 @@ class LibvirtManager:
         # Fallback to mock
         self.conn = MockLibvirtConnection()
         self.is_mock = True
+
+    def _ensure_rangda_vm(self):
+        import os
+        import subprocess
+        try:
+            self.conn.lookupByName("Rangda's VM")
+        except libvirt.libvirtError:
+            xml_path = os.path.join(os.path.dirname(__file__), "../../../intake-node/intake_vm.xml")
+            if os.path.exists(xml_path):
+                with open(xml_path, "r") as f:
+                    xml = f.read()
+                xml = xml.replace("<name>rangda-interactive-intake</name>", "<name>Rangda's VM</name>")
+                try:
+                    is_sandbox = False
+                    if os.path.exists("/etc/os-release"):
+                        with open("/etc/os-release", "r") as f:
+                            if "EndeavourOS" in f.read():
+                                is_sandbox = True
+                                
+                    if not is_sandbox:
+                        # Auto-provision 20GB disk for Rangda's VM only on live USB
+                        disk_path = "/var/lib/libvirt/images/rangda-intake-node.qcow2"
+                        os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+                        if not os.path.exists(disk_path):
+                            subprocess.run(["qemu-img", "create", "-f", "qcow2", disk_path, "20G"], check=True)
+                            logger.info(f"Auto-provisioned 20GB disk for Rangda's VM at {disk_path}")
+                        
+                        self.conn.defineXML(xml)
+                        logger.info("Automatically defined core intake: Rangda's VM")
+                    else:
+                        raise Exception("Development Sandbox Active - Bypassing physical disk carving.")
+                except Exception as e:
+                    logger.warning(f"Bypassed auto-define Rangda's VM: {e}")
+                    # Inject a visual dummy for local EndeavourOS development
+                    import uuid
+                    self.dummy_vms.append({
+                        "id": 999,
+                        "name": "Rangda's VM",
+                        "uuid": str(uuid.uuid4()),
+                        "status": "shut off",
+                        "vcpus": 4,
+                        "memory_kb": 4194304,
+                        "avatar": "rangda.jpg"
+                    })
 
     def disconnect(self):
         if self.conn:

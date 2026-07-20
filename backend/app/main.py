@@ -54,10 +54,12 @@ app.add_middleware(
 )
 
 from app.api.storage import router as storage_router
+from app.api.p2p import router as p2p_router
 
 # Mount Routers
 app.include_router(vms_router, prefix="/api/vms", tags=["Virtual Machines"])
 app.include_router(storage_router, prefix="/api/storage", tags=["Storage"])
+app.include_router(p2p_router)
 
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles

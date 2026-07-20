@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from typing import List, Optional
 import xml.etree.ElementTree as ET
@@ -7,6 +7,9 @@ import psutil
 import re
 import os
 import uuid
+import pty
+import fcntl
+import asyncio
 from app.core.libvirt import get_libvirt_manager, LibvirtManager
 
 try:
@@ -28,12 +31,15 @@ class VMResponse(BaseModel):
     vnc_port: Optional[int] = None
     ws_port: Optional[int] = None
     ip_address: Optional[str] = None
+    avatar: Optional[str] = None
 
 class VMCreate(BaseModel):
     name: str
     vcpus: int
     memory_mb: int
+    storage_gb: int
     iso_path: str
+    avatar: str
 
 class VMAction(BaseModel):
     action: str # start, shutdown, destroy, reboot
@@ -81,6 +87,16 @@ def get_vms(manager: LibvirtManager = Depends(get_libvirt_manager)):
             ws_port = None
             ip_address = None
             
+            avatar = None
+            try:
+                xml_desc = dom.XMLDesc(0)
+                root = ET.fromstring(xml_desc)
+                desc = root.find("description")
+                if desc is not None and desc.text:
+                    avatar = desc.text
+            except Exception:
+                pass
+
             if state == libvirt.VIR_DOMAIN_RUNNING:
                 try:
                     xml_desc = dom.XMLDesc(0)
@@ -110,7 +126,8 @@ def get_vms(manager: LibvirtManager = Depends(get_libvirt_manager)):
                 memory_kb=dom.maxMemory(),
                 vnc_port=vnc_port,
                 ws_port=ws_port,
-                ip_address=ip_address
+                ip_address=ip_address,
+                avatar=avatar
             ))
             
         # Append safe dummy VMs created on EndeavourOS during live mode
@@ -125,7 +142,8 @@ def get_vms(manager: LibvirtManager = Depends(get_libvirt_manager)):
                 memory_kb=dvm["memory_kb"],
                 vnc_port=5900 if is_run else None,
                 ws_port=5700 if is_run else None,
-                ip_address="192.168.122.100" if is_run else None
+                ip_address="192.168.122.100" if is_run else None,
+                avatar=dvm.get("avatar", "avatar1.jpg")
             ))
             
     except Exception as e:
@@ -157,6 +175,10 @@ def vm_action(uuid_str: str, action_data: VMAction, manager: LibvirtManager = De
         raise HTTPException(status_code=404, detail=f"VM with UUID {uuid_str} not found")
         
     action = action_data.action.lower()
+    
+    if dom.name() == "Rangda's VM" and action == "destroy":
+        raise HTTPException(status_code=403, detail="System Lock: Cannot kill the core Intake VM.")
+        
     try:
         if action == "start":
             dom.create()
@@ -173,6 +195,97 @@ def vm_action(uuid_str: str, action_data: VMAction, manager: LibvirtManager = De
         raise HTTPException(status_code=500, detail=f"Failed to execute action {action}")
         
     return {"status": "success", "action": action, "uuid": uuid_str}
+
+@router.websocket("/{uuid_str}/ssh")
+async def vm_ssh(websocket: WebSocket, uuid_str: str, manager: LibvirtManager = Depends(get_libvirt_manager)):
+    await websocket.accept()
+    
+    # Get IP address
+    ip_address = None
+    is_dummy = False
+    
+    if manager.is_mock or uuid_str.startswith("0000"):
+        ip_address = "127.0.0.1"
+        is_dummy = True
+    else:
+        # Check if it's in dummy_vms fallback
+        for dvm in manager.dummy_vms:
+            if dvm["uuid"] == uuid_str:
+                ip_address = "127.0.0.1"
+                is_dummy = True
+                break
+                
+        if not is_dummy:
+            conn = manager.get_connection()
+            try:
+                dom = conn.lookupByUUIDString(uuid_str)
+                ifaces = dom.interfaceAddresses(libvirt.VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_LEASE)
+                if ifaces:
+                    for iface, data in ifaces.items():
+                        if data.get('addrs'):
+                            ip_address = data['addrs'][0]['addr']
+                            break
+            except Exception:
+                pass
+            
+    if not ip_address:
+        await websocket.send_text("\r\n\x1b[31m[ERROR]\x1b[0m VM has no IP address. Is it fully booted?\r\n")
+        await websocket.close()
+        return
+
+    master_fd, slave_fd = pty.openpty()
+    
+    if is_dummy:
+        cmd = ["bash", "-i"]
+    else:
+        cmd = ["ssh", "-o", "StrictHostKeyChecking=no", f"root@{ip_address}"]
+        
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
+        preexec_fn=os.setsid
+    )
+    os.close(slave_fd)
+    
+    # Keep master_fd blocking so os.read just waits in the executor thread natively!
+    async def read_from_pty():
+        loop = asyncio.get_event_loop()
+        while True:
+            try:
+                data = await loop.run_in_executor(None, os.read, master_fd, 4096)
+                if not data:
+                    break
+                await websocket.send_text(data.decode('utf-8', errors='replace'))
+            except Exception:
+                break
+
+    async def write_to_pty():
+        try:
+            while True:
+                data = await websocket.receive_text()
+                os.write(master_fd, data.encode('utf-8'))
+        except Exception:
+            pass
+
+    task_read = asyncio.create_task(read_from_pty())
+    task_write = asyncio.create_task(write_to_pty())
+    
+    done, pending = await asyncio.wait([task_read, task_write], return_when=asyncio.FIRST_COMPLETED)
+    for p in pending:
+        p.cancel()
+        
+    try:
+        process.terminate()
+    except:
+        pass
+    try:
+        os.close(master_fd)
+    except:
+        pass
+    try:
+        await websocket.close()
+    except:
+        pass
 
 @router.post("")
 def create_vm(vm_data: VMCreate, manager: LibvirtManager = Depends(get_libvirt_manager)):
@@ -196,9 +309,32 @@ def create_vm(vm_data: VMCreate, manager: LibvirtManager = Depends(get_libvirt_m
     if not safe_name:
         raise HTTPException(status_code=400, detail="Invalid VM Name provided. Use standard alphanumeric characters.")
 
+    import subprocess
+    
+    # Ensure EndeavourOS safety lock prevents disk carving on host
+    is_sandbox = False
+    if os.path.exists("/etc/os-release"):
+        with open("/etc/os-release", "r") as f:
+            if "EndeavourOS" in f.read():
+                is_sandbox = True
+    
+    # Auto-provision virtual hard drive (Only if not in sandbox)
+    if not is_sandbox:
+        disk_path = f"/var/lib/libvirt/images/{safe_name}.qcow2"
+        try:
+            os.makedirs(os.path.dirname(disk_path), exist_ok=True)
+            if not os.path.exists(disk_path):
+                subprocess.run(["qemu-img", "create", "-f", "qcow2", disk_path, f"{vm_data.storage_gb}G"], check=True)
+                logger.info(f"Auto-provisioned {vm_data.storage_gb}GB virtual disk for {safe_name}")
+        except Exception as e:
+            logger.error(f"Disk creation failed: {e}")
+            if not manager.is_mock:
+                raise HTTPException(status_code=500, detail="Failed to provision virtual hard drive")
+
     # 2. Optimized Libvirt XML Engine
     xml_blueprint = f"""<domain type='kvm'>
   <name>{safe_name}</name>
+  <description>{vm_data.avatar}</description>
   <memory unit='MiB'>{vm_data.memory_mb}</memory>
   <vcpu placement='static'>{vm_data.vcpus}</vcpu>
   <os>
@@ -225,7 +361,7 @@ def create_vm(vm_data: VMCreate, manager: LibvirtManager = Depends(get_libvirt_m
     </disk>
     <interface type='network'>
       <source network='default'/>
-      <model type='virtio'/>
+      <model type='e1000'/>
     </interface>
     <graphics type='vnc' port='-1' autoport='yes' websocket='-1' listen='0.0.0.0'/>
     <video>
@@ -262,7 +398,8 @@ def create_vm(vm_data: VMCreate, manager: LibvirtManager = Depends(get_libvirt_m
                 "uuid": str(uuid.uuid4()),
                 "status": "shut off",
                 "vcpus": vm_data.vcpus,
-                "memory_kb": vm_data.memory_mb * 1024
+                "memory_kb": vm_data.memory_mb * 1024,
+                "avatar": vm_data.avatar
             })
             
         return {"status": "success", "message": "Simulated Safe-Mode Domain Generated", "name": safe_name}

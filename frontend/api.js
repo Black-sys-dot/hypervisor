@@ -55,6 +55,25 @@ const api = {
             console.error("ISO fetch failed", e);
             return [];
         }
+    },
+
+    async getVMFiles(uuid, path = "/") {
+        const res = await fetch(`${API_BASE}/p2p/${uuid}/files?path=${encodeURIComponent(path)}`);
+        if (!res.ok) throw new Error("Failed to fetch VM files or Access Denied");
+        return await res.json();
+    },
+
+    async transferP2P(transferData) {
+        const res = await fetch(`${API_BASE}/p2p/transfer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(transferData)
+        });
+        if (!res.ok) {
+            const errorData = await res.json().catch(() => ({}));
+            throw new Error(errorData.detail || "P2P Transfer Failed");
+        }
+        return await res.json();
     }
 };
 
