@@ -5,6 +5,8 @@ function App() {
     const [health, setHealth] = useState(null);
     const [metrics, setMetrics] = useState(null);
     const [isos, setIsos] = useState([]);
+    const [sessions, setSessions] = useState([]);
+    const [activeAudioVMs, setActiveAudioVMs] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const [showModal, setShowModal] = useState(false);
@@ -17,11 +19,13 @@ function App() {
 
     const fetchData = async () => {
         try {
-            const [healthData, vmsData, metricsData, isosData] = await Promise.all([
+            const [healthData, vmsData, metricsData, isosData, sessionsData, audioData] = await Promise.all([
                 window.api.getHealth(),
                 window.api.getVMs(),
                 window.api.getMetrics(),
-                window.api.getIsos()
+                window.api.getIsos(),
+                window.api.getSessions(),
+                window.api.getAudioStatus()
             ]);
             
             // Ensure Rangda's VM is always first
@@ -35,10 +39,23 @@ function App() {
             setVms(sortedVms);
             setMetrics(metricsData);
             setIsos(isosData);
+            setSessions(sessionsData);
+            setActiveAudioVMs(audioData || []);
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const launchNativeConsole = async (name) => {
+        try {
+            const res = await fetch(`/api/vms/${name}/console_native`, { method: 'POST' });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Failed to launch native console');
+        } catch (e) {
+            console.error("Native Console Error:", e);
+            alert("Failed to launch Native Console: " + e.message);
         }
     };
 
@@ -126,6 +143,15 @@ function App() {
     return (
         <div className="w-full min-h-screen overflow-hidden relative flex items-center justify-center bg-[#09090b]">
             
+            {/* Global Battery Status */}
+            <div className="absolute top-8 right-12 flex items-center gap-2 bg-black/60 px-4 py-2 rounded-full border border-white/10 z-50 shadow-2xl backdrop-blur-xl">
+                {metrics?.battery?.charging ? (
+                    <svg className="w-5 h-5 text-emerald-400 animate-pulse drop-shadow-[0_0_8px_rgba(52,211,153,1)]" fill="currentColor" viewBox="0 0 20 20"><path d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" /></svg>
+                ) : (
+                    <svg className="w-5 h-5 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                )}
+                <span className="text-sm font-bold tracking-widest text-white">{metrics?.battery ? metrics.battery.percent : '--'}%</span>
+            </div>
             {/* Background Image & Overlay */}
             <img 
                 src="assets/bg.jpg" 
@@ -170,7 +196,7 @@ function App() {
                 <div className="w-2/3 h-full p-8 flex flex-col gap-6 overflow-y-auto relative">
                     
                     {/* Host Resource Widgets */}
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-3 gap-6">
                         <div className="bg-white/[0.02] backdrop-blur-md p-6 rounded-2xl border border-white/[0.08]">
                             <h3 className="text-white/50 text-xs uppercase tracking-wider mb-2">Memory Allocation</h3>
                             <div className="text-3xl font-light mb-4 text-white/90">
@@ -187,6 +213,15 @@ function App() {
                             </div>
                             <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
                                 <div className="h-full bg-blue-500 rounded-full shadow-[0_0_10px_#3b82f6] transition-all duration-700" style={{ width: `${metrics ? metrics.cpu.percent : 0}%` }}></div>
+                            </div>
+                        </div>
+                        <div className="bg-white/[0.02] backdrop-blur-md p-6 rounded-2xl border border-white/[0.08]">
+                            <h3 className="text-white/50 text-xs uppercase tracking-wider mb-2">Storage Allocation</h3>
+                            <div className="text-3xl font-light mb-4 text-white/90">
+                                {metrics?.storage ? metrics.storage.used_gb : '--'} <span className="text-sm text-white/40">/ {metrics?.storage ? metrics.storage.total_gb : '--'} GB</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-500 rounded-full shadow-[0_0_10px_#10b981] transition-all duration-700" style={{ width: `${metrics?.storage ? metrics.storage.percent : 0}%` }}></div>
                             </div>
                         </div>
                     </div>
@@ -260,8 +295,8 @@ function App() {
                                             <div className="flex flex-col gap-2 w-full">
                                                 <div className="flex gap-2">
                                                     <button 
-                                                        onClick={() => setConsoleUrl(`/dashboard/console.html?ws=${vm.ws_port || 5700}`)}
-                                                        className="flex-1 bg-blue-600/80 hover:bg-blue-500 transition-colors py-2 rounded text-xs tracking-wider uppercase font-medium shadow-[0_0_15px_rgba(59,130,246,0.3)] text-white"
+                                                        onClick={() => launchNativeConsole(vm.name)}
+                                                        className={`flex-1 bg-blue-600/80 hover:bg-blue-500 transition-colors py-2 rounded text-xs tracking-wider uppercase font-medium shadow-[0_0_15px_rgba(59,130,246,0.3)] text-white`}
                                                     >
                                                         Console
                                                     </button>
@@ -354,7 +389,7 @@ function App() {
                                 >
                                     <option value="" disabled>Select an ISO...</option>
                                     {isos.map((iso, idx) => (
-                                        <option key={idx} value={`/var/lib/libvirt/boot/${iso}`} className="bg-gray-900 text-white">{iso}</option>
+                                        <option key={idx} value={iso} className="bg-gray-900 text-white">{iso.split('/').pop()}</option>
                                     ))}
                                 </select>
                             </div>
@@ -393,18 +428,7 @@ function App() {
                 </div>
             )}
 
-            {/* Console Modal Overlay */}
-            {consoleUrl && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] flex flex-col p-8">
-                    <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold tracking-widest text-white/90">VM CONSOLE</h2>
-                        <button onClick={() => setConsoleUrl(null)} className="text-white/50 hover:text-ruby transition-colors text-4xl leading-none">&times;</button>
-                    </div>
-                    <div className="flex-1 bg-black rounded-xl overflow-hidden border border-white/[0.08] shadow-[0_0_50px_rgba(0,0,0,0.8)] relative">
-                        <iframe src={consoleUrl} className="absolute inset-0 w-full h-full border-0"></iframe>
-                    </div>
-                </div>
-            )}
+
             {/* SSH Terminal Modal */}
             {sshVm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -420,8 +444,49 @@ function App() {
                 </div>
             )}
             
-            {/* P2P Matchmaker File-Sharing Panel */}
-            <window.P2PPanel vms={vms} />
+            {/* P2P Matchmaker File-Sharing Panel (Disabled per user request) */}
+            {/* <window.P2PPanel vms={vms} /> */}
+
+            {/* Active Sessions Tray */}
+            <div className="absolute top-1/2 -translate-y-1/2 left-8 z-50 flex flex-col gap-4 bg-black/40 backdrop-blur-xl border border-white/10 p-3 rounded-full shadow-2xl">
+                {sessions.map(s => (
+                    <button 
+                        key={s.id} 
+                        onClick={() => window.api.activateSession(s.id)}
+                        className="w-12 h-12 rounded-full overflow-hidden border border-white/10 hover:border-white/50 hover:scale-110 transition-all duration-300 group relative flex items-center justify-center bg-black"
+                        title={`Resume ${s.title}`}
+                    >
+                        {s.type === 'obs' ? (
+                            <svg className="w-6 h-6 text-white/80 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                        ) : (
+                            <img 
+                                src={`assets/avatars/${vms.find(v => v.name === s.title)?.avatar || 'avatar1.jpg'}`} 
+                                alt={s.title} 
+                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100" 
+                            />
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            {/* Quarantine Pet 2 / Cute Pinch */}
+            <div className="absolute -top-8 left-0 z-50 pointer-events-none">
+                <img src="assets/moè-moèfear.gif" alt="Cute Pinch" className="w-64 h-auto opacity-90 drop-shadow-2xl mix-blend-screen scale-x-[-1] scale-y-[-1]" />
+            </div>
+
+            {/* Quarantine Pet / Cool Verycute */}
+            <div className="absolute -bottom-4 left-0 z-50 pointer-events-none">
+                <img src="assets/cool-verycute.gif" alt="Cool Very Cute" className="w-64 h-auto opacity-90 drop-shadow-2xl mix-blend-screen" />
+            </div>
+
+            {/* OBS Studio Launch Button */}
+            <button 
+                onClick={() => fetch('http://127.0.0.1:8000/api/host/launch-obs', { method: 'POST' })}
+                className="absolute bottom-8 right-12 z-50 p-4 rounded-full bg-black/60 border border-white/10 hover:bg-white/10 hover:border-white/30 transition-all duration-300 shadow-2xl backdrop-blur-xl group cursor-pointer"
+                title="Launch OBS Studio"
+            >
+                <svg className="w-6 h-6 text-white/60 group-hover:text-red-400 transition-colors drop-shadow" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+            </button>
         </div>
     );
 }

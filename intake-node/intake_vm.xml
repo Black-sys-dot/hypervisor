@@ -1,5 +1,7 @@
 <domain type='kvm'>
-  <name>rangda-interactive-intake</name>
+  <name>Rangda's VM</name>
+  <description>rangda.jpg</description>
+  <uuid>68d0dd32-35c8-40fb-8566-e80b70306176</uuid>
   <memory unit='KiB'>4194304</memory>
   <vcpu placement='static'>4</vcpu>
   <os>
@@ -23,8 +25,15 @@
     
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
-      <source file='/var/lib/libvirt/images/rangda-intake-node.qcow2'/>
+      <source file='/var/lib/rangda/storage/rangda-intake-node.qcow2'/>
       <target dev='vda' bus='virtio'/>
+    </disk>
+    
+    <disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw'/>
+      <source file='/var/lib/rangda/storage/boot/EndeavourOS_Titan-Neo-2026.04.27.iso'/>
+      <target dev='sda' bus='sata'/>
+      <readonly/>
     </disk>
     
     <interface type='network'>
@@ -32,26 +41,20 @@
       <model type='e1000'/>
     </interface>
 
-    <!-- Trusted Vault virtio-fs Mount -->
+    <!-- Virtio-FS mounts -->
     <filesystem type='mount' accessmode='passthrough'>
       <driver type='virtiofs'/>
-      <source dir='/var/lib/libvirt/images/trusted'/>
+      <source dir='/var/lib/rangda/storage/trusted'/>
       <target dir='vault_share'/>
     </filesystem>
-
-    <!-- Quarantine virtio-fs Mount -->
     <filesystem type='mount' accessmode='passthrough'>
       <driver type='virtiofs'/>
-      <source dir='/var/lib/libvirt/quarantine'/>
+      <source dir='/var/lib/rangda/storage/quarantine'/>
       <target dir='quarantine_share'/>
     </filesystem>
 
-    <!-- SPICE Graphics and Agent Integration (Clipboard & Resizing) -->
-    <graphics type='spice' autoport='yes' listen='127.0.0.1'>
-      <listen type='address' address='127.0.0.1'/>
-      <clipboard copypaste='yes'/>
-      <mouse mode='client'/>
-    </graphics>
+    <!-- VNC Graphics with WebSockets -->
+    <graphics type='vnc' port='-1' autoport='yes' websocket='-1' listen='0.0.0.0'/>
     
     <video>
       <model type='qxl' ram='65536' vram='65536' vgamem='16384' heads='1'/>
@@ -62,11 +65,10 @@
       <target type='virtio' name='org.qemu.guest_agent.0'/>
     </channel>
 
-    <!-- SPICE vdagent Channel (Clipboard/Mouse) -->
-    <channel type='spicevmc'>
-      <target type='virtio' name='com.redhat.spice.0'/>
-    </channel>
-
+    <sound model='ich9'>
+      <audio id='1'/>
+    </sound>
+    <audio id='1' type='pulseaudio' serverName='127.0.0.1:4713'/>
     <input type='tablet' bus='usb'/>
     <input type='mouse' bus='ps2'/>
   </devices>

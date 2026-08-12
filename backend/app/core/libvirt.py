@@ -133,11 +133,12 @@ class LibvirtManager:
                                 
                     if not is_sandbox:
                         # Auto-provision 20GB disk for Rangda's VM only on live USB
-                        disk_path = "/var/lib/libvirt/images/rangda-intake-node.qcow2"
+                        storage_dir = os.getenv("RANGDA_STORAGE_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../storage")))
+                        disk_path = os.path.join(storage_dir, "rangda-intake-node.qcow2")
                         os.makedirs(os.path.dirname(disk_path), exist_ok=True)
                         if not os.path.exists(disk_path):
-                            subprocess.run(["qemu-img", "create", "-f", "qcow2", disk_path, "20G"], check=True)
-                            logger.info(f"Auto-provisioned 20GB disk for Rangda's VM at {disk_path}")
+                            subprocess.run(["qemu-img", "create", "-f", "qcow2", disk_path, "40G"], check=True)
+                            logger.info(f"Auto-provisioned 40GB disk for Rangda's VM at {disk_path}")
                         
                         self.conn.defineXML(xml)
                         logger.info("Automatically defined core intake: Rangda's VM")

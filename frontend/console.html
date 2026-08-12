@@ -11,9 +11,16 @@
 </head>
 <body>
     <div id="status">Connecting to console...</div>
+    <script>
+        window.onerror = function(msg, url, lineNo, columnNo, error) {
+            document.getElementById('status').style.display = 'block';
+            document.getElementById('status').innerText += '\n[JS Error]: ' + msg + ' at ' + lineNo + ':' + columnNo;
+            return false;
+        };
+    </script>
     <div id="screen"></div>
     <script type="module">
-        import RFB from 'https://cdn.jsdelivr.net/npm/@novnc/novnc@1.4.0/core/rfb.js';
+        import RFB from './vendor/novnc/core/rfb.js';
         
         const urlParams = new URLSearchParams(window.location.search);
         const wsPort = urlParams.get('ws');

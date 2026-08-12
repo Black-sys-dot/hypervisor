@@ -37,6 +37,32 @@ const api = {
         }
     },
     
+    async getSessions() {
+        try {
+            const res = await fetch(`${API_BASE}/host/sessions`);
+            return await res.json();
+        } catch (e) {
+            return [];
+        }
+    },
+    
+    async getAudioStatus() {
+        try {
+            const res = await fetch(`${API_BASE}/host/audio`);
+            return await res.json();
+        } catch (e) {
+            return [];
+        }
+    },
+    
+    async activateSession(sessionId) {
+        await fetch(`${API_BASE}/host/activate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: sessionId })
+        });
+    },
+    
     async createVM(vmData) {
         const res = await fetch(`${API_BASE}/vms`, {
             method: 'POST',

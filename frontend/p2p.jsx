@@ -33,6 +33,16 @@ window.P2PPanel = function P2PPanel({ vms }) {
         }
     }, [rightVm]);
 
+    useEffect(() => {
+        if (leftVm && rightVm) {
+            if (rightVm === 'host' && leftVm !== 'host') {
+                setErrorMsg("Transfer Blocked. Use Rangda's VM special folders.");
+            } else {
+                setErrorMsg("");
+            }
+        }
+    }, [leftVm, rightVm]);
+
     const handleDragStart = (e, file) => {
         if (file.type !== 'file') {
             e.preventDefault();
@@ -45,6 +55,14 @@ window.P2PPanel = function P2PPanel({ vms }) {
     const handleDrop = async (e, destFolder) => {
         e.preventDefault();
         if (!draggedFile || !leftVm || !rightVm) return;
+
+        // Hypervisor Security Rule: No VM can push directly to Host.
+        if (rightVm === 'host' && leftVm !== 'host') {
+            setErrorMsg("Transfer Blocked. Use Rangda's VM special folders.");
+            setTransferStatus('error');
+            setTimeout(() => setTransferStatus('idle'), 3000);
+            return;
+        }
 
         setTransferStatus('transferring');
         setErrorMsg("");

@@ -176,20 +176,29 @@ def vm_action(uuid_str: str, action_data: VMAction, manager: LibvirtManager = De
         
     action = action_data.action.lower()
     
-    if dom.name() == "Rangda's VM" and action == "destroy":
-        raise HTTPException(status_code=403, detail="System Lock: Cannot kill the core Intake VM.")
-        
     try:
         if action == "start":
-            dom.create()
-        elif action == "shutdown":
-            dom.shutdown()
+            state, _ = dom.state()
+            # If HAS_LIBVIRT, check against libvirt.VIR_DOMAIN_RUNNING or state code 1
+            if state not in (1, getattr(libvirt, 'VIR_DOMAIN_RUNNING', 1)):
+                dom.create()
+        elif action == "shutdown" or action == "stop":
+            try:
+                dom.shutdown()
+            except Exception:
+                dom.destroy()
         elif action == "destroy":
-            dom.destroy()
+            if dom.name() == "Rangda's VM":
+                try:
+                    dom.shutdown()
+                except Exception:
+                    dom.destroy()
+            else:
+                dom.destroy()
         elif action == "reboot":
             dom.reboot()
         else:
-            raise HTTPException(status_code=400, detail=f"Invalid action: {action}. Supported: start, shutdown, destroy, reboot.")
+            raise HTTPException(status_code=400, detail=f"Invalid action: {action}. Supported: start, shutdown, stop, destroy, reboot.")
     except Exception as e:
         logger.error(f"Failed to execute {action} on {uuid_str}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to execute action {action}")
@@ -319,8 +328,9 @@ def create_vm(vm_data: VMCreate, manager: LibvirtManager = Depends(get_libvirt_m
                 is_sandbox = True
     
     # Auto-provision virtual hard drive (Only if not in sandbox)
+    images_dir = os.getenv("RANGDA_IMAGES_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../images")))
     if not is_sandbox:
-        disk_path = f"/var/lib/libvirt/images/{safe_name}.qcow2"
+        disk_path = os.path.join(images_dir, f"{safe_name}.qcow2")
         try:
             os.makedirs(os.path.dirname(disk_path), exist_ok=True)
             if not os.path.exists(disk_path):
@@ -350,7 +360,7 @@ def create_vm(vm_data: VMCreate, manager: LibvirtManager = Depends(get_libvirt_m
   <devices>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
-      <source file='/var/lib/libvirt/images/{safe_name}.qcow2'/>
+      <source file='{disk_path}'/>
       <target dev='sdb' bus='sata'/>
     </disk>
     <disk type='file' device='cdrom'>
@@ -363,10 +373,21 @@ def create_vm(vm_data: VMCreate, manager: LibvirtManager = Depends(get_libvirt_m
       <source network='default'/>
       <model type='e1000'/>
     </interface>
-    <graphics type='vnc' port='-1' autoport='yes' websocket='-1' listen='0.0.0.0'/>
+    <graphics type='spice' autoport='no'>
+      <gl enable='yes'/>
+    </graphics>
+    <channel type='spicevmc'>
+      <target type='virtio' name='com.redhat.spice.0'/>
+    </channel>
     <video>
-      <model type='qxl' ram='65536' vram='65536' vgamem='16384' heads='1'/>
+      <model type='virtio' heads='1'>
+        <acceleration accel3d='yes'/>
+      </model>
     </video>
+    <sound model='ich9'>
+      <audio id='1'/>
+    </sound>
+    <audio id='1' type='pulseaudio' serverName='127.0.0.1:4713'/>
     <input type='tablet' bus='usb'/>
     <input type='mouse' bus='ps2'/>
   </devices>
@@ -417,3 +438,31 @@ def create_vm(vm_data: VMCreate, manager: LibvirtManager = Depends(get_libvirt_m
         except Exception as e:
             logger.error(f"Failed to define VM via libvirt: {e}")
             raise HTTPException(status_code=500, detail=f"Hypervisor Definition Error: {str(e)}")
+
+@router.post("/{vm_name}/console_native")
+def launch_native_console(vm_name: str, manager: LibvirtManager = Depends(get_libvirt_manager)):
+    """Launch native hardware-accelerated SPICE client on the host display"""
+    try:
+        import subprocess
+        import os
+        import libvirt
+        
+        # Ensure the VM is running
+        dom = manager.conn.lookupByName(vm_name)
+        if not dom.isActive():
+            raise HTTPException(status_code=400, detail="VM must be running to open console.")
+            
+        # Spawn virt-viewer in a detached process on the primary display
+        subprocess.Popen(
+            ["virt-viewer", "--attach", "--connect", "qemu:///system", vm_name],
+            env=dict(os.environ, DISPLAY=":0"),
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        return {"status": "success", "message": "Native console launched on host display"}
+    except libvirt.libvirtError as e:
+        raise HTTPException(status_code=404, detail=f"VM not found: {str(e)}")
+    except Exception as e:
+        logger.error(f"Failed to launch native console: {e}")
+        raise HTTPException(status_code=500, detail=f"Native Client Error: {str(e)}")

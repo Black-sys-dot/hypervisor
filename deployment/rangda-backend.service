@@ -4,9 +4,9 @@ After=network.target libvirtd.service
 
 [Service]
 Type=simple
-User=root
-WorkingDirectory=/root/rangda-dashboard/backend
-ExecStart=/usr/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+User=rangda
+WorkingDirectory=/opt/rangda-dashboard/backend
+ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5
 

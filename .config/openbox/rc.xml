@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <keyboard>
+    <keybind key="XF86AudioRaiseVolume">
+      <action name="Execute">
+        <command>wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+</command>
+      </action>
+    </keybind>
+    <keybind key="XF86AudioLowerVolume">
+      <action name="Execute">
+        <command>wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-</command>
+      </action>
+    </keybind>
+    <keybind key="XF86AudioMute">
+      <action name="Execute">
+        <command>wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle</command>
+      </action>
+    </keybind>
+  </keyboard>
+  <applications>
+    <application class="*">
+      <decor>no</decor>
+      <maximized>yes</maximized>
+      <fullscreen>yes</fullscreen>
+    </application>
+    <application class="obs">
+      <decor>yes</decor>
+      <maximized>no</maximized>
+      <fullscreen>no</fullscreen>
+    </application>
+    <application class="Virt-viewer">
+      <decor>yes</decor>
+      <maximized>no</maximized>
+      <fullscreen>no</fullscreen>
+    </application>
+    <application class="virt-viewer">
+      <decor>yes</decor>
+      <maximized>no</maximized>
+      <fullscreen>no</fullscreen>
+    </application>
+    <application class="Remote-viewer">
+      <decor>yes</decor>
+      <maximized>no</maximized>
+      <fullscreen>no</fullscreen>
+    </application>
+    <application class="remote-viewer">
+      <decor>yes</decor>
+      <maximized>no</maximized>
+      <fullscreen>no</fullscreen>
+    </application>
+  </applications>
+</openbox_config>

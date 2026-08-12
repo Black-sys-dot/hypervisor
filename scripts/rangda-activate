@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+BACKEND_DIR="${PROJECT_DIR}/backend"
+
+echo "==============================================="
+echo "   RANGDA CORE HYPERVISOR - ACTIVATION SEQUENCE"
+echo "==============================================="
+
+# 1. Start Backend if not already running
+if curl -s http://127.0.0.1:8000/api/health > /dev/null 2>&1; then
+    echo "[+] Backend API is already active at http://127.0.0.1:8000"
+else
+    echo "[*] Starting Rangda Backend API server (Localhost Locked)..."
+    cd "${BACKEND_DIR}"
+    python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/rangda-backend.log 2>&1 &
+    
+    # Wait for backend to be ready
+    READY=0
+    for i in {1..20}; do
+        if curl -s http://127.0.0.1:8000/api/health > /dev/null 2>&1; then
+            READY=1
+            echo "[+] Backend API successfully started!"
+            break
+        fi
+        sleep 0.5
+    done
+    if [ $READY -eq 0 ]; then
+        echo "[!] Warning: Backend API took longer to start. Check /tmp/rangda-backend.log"
+    fi
+fi
+
+# 2. Configure Openbox for Borderless Kiosk Mode (Disabled to preserve custom rules)
+# The configuration is permanently preserved in ~/.config/openbox/rc.xml
+
+# 3. Kiosk Launcher Flags
+CHROMIUM_FLAGS="--kiosk --no-first-run --noerrdialogs --disable-infobars --disable-session-crashed-bubble --password-store=basic --autoplay-policy=no-user-gesture-required --app=http://127.0.0.1:8000/dashboard/"
+
+# Detect chromium executable name
+CHROMIUM_BIN="chromium"
+if ! command -v chromium > /dev/null 2>&1; then
+    if command -v chromium-browser > /dev/null 2>&1; then
+        CHROMIUM_BIN="chromium-browser"
+    elif command -v google-chrome > /dev/null 2>&1; then
+        CHROMIUM_BIN="google-chrome"
+    fi
+fi
+
+echo "[*] Launching Rangda Kiosk Dashboard in Openbox (Borderless Fullscreen)..."
+
+if [ -n "$DISPLAY" ]; then
+    # Running inside an existing X11 session
+    if ! pgrep -x "openbox" > /dev/null 2>&1; then
+        openbox &
+    fi
+    exec $CHROMIUM_BIN $CHROMIUM_FLAGS
+else
+    # Running from TTY console -> start X server on current VT
+    VT_NUM=$(fgconsole 2>/dev/null || echo 1)
+    
+    cat << EOF > /tmp/rangda-xinitrc
+#!/bin/sh
+openbox &
+exec $CHROMIUM_BIN $CHROMIUM_FLAGS
+EOF
+    chmod +x /tmp/rangda-xinitrc
+
+    if command -v startx > /dev/null 2>&1; then
+        exec dbus-run-session startx /tmp/rangda-xinitrc -- :0 vt${VT_NUM} -nolisten tcp
+    else
+        exec dbus-run-session xinit /tmp/rangda-xinitrc -- :0 vt${VT_NUM} -nolisten tcp
+    fi
+fi
