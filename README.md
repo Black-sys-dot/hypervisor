@@ -2,6 +2,12 @@
 
 > **Note**: The newly created `sanitized-source` branch contains the full and latest code. Please switch to that branch for the most up-to-date features and fixes.
 
+## 🎥 Demo
+
+Watch the walkthrough of Rangda in action:
+
+**[▶ View the demo on LinkedIn](https://lnkd.in/p/ddynNdME)**
+
 Rangda Core Hypervisor is a specialized, interactive virtual machine management and network isolation platform. It provides a React-based web dashboard interfacing with a FastAPI backend that securely orchestrates `libvirt`/KVM virtual machines. 
 
 The system features robust zero-knowledge network isolation through dedicated `nftables` rules, enabling secure "intake" environments to validate untrusted assets safely.
