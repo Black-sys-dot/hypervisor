@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 @router.get("/isos", response_model=List[str])
 def list_isos():
     prod_dir = "/var/lib/libvirt/boot/"
-    local_dir = "/home/black/Projects/hypervisor/storage/boot/"
+    local_dir = "/var/lib/rangda/storage/boot/"
     
     # Check production directory first, then fallback to local project directory
     target_dir = prod_dir if os.path.exists(prod_dir) and os.path.isdir(prod_dir) else local_dir
