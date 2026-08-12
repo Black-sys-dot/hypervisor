@@ -1,6 +1,6 @@
 # Rangda Core Hypervisor Dashboard
 
-> **Note**: The 3rd latest created branch (`usb-fixes`) contains the full and latest code. Please switch to that branch for the most up-to-date features and fixes.
+> **Note**: The newly created `sanitized-source` branch contains the full and latest code. Please switch to that branch for the most up-to-date features and fixes.
 
 Rangda Core Hypervisor is a specialized, interactive virtual machine management and network isolation platform. It provides a React-based web dashboard interfacing with a FastAPI backend that securely orchestrates `libvirt`/KVM virtual machines. 
 
